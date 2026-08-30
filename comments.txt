@@ -1,0 +1,62 @@
+Working generates correctly pallets most of the cases
+HEX:
+#598094
+#7EA8C8
+#69C1B3
+#72B8CE
+#6D92C2
+
+RGB:
+[89, 128, 148]
+[126, 168, 200]
+[105, 193, 179]
+[114, 184, 206]
+[109, 146, 194]
+
+LAB:
+(131.0, 120.8, 113.0)
+(171.2, 122.8, 107.6)
+(185.0, 98.6, 127.6)
+(181.8, 112.0, 110.6)
+(152.2, 128.6, 99.2)
+
+HEX:
+#803F47
+#AB7A8C
+#CEA0B3
+#E4E0ED
+#746E7C
+
+#598094
+#7EA8C8
+#69C1B3
+#72B8CE
+#6D92C2
+
+#598094
+#7EA8C8
+#69C1B3
+#72B8CE
+#6D92C2
+
+The last example without specific roots or metrics permamently build in the program after check.
+Input: Sky blue
+HEX:
+#9ED9E1
+#6FC1C6
+#74D4E5
+#6BBAC3
+#76C6CD
+Morning sky 
+#484660
+#75718F
+#9B838D
+#9E869D
+#F4C2BE
+Morning sky sun is rising
+HEX:
+#A6654E
+#BB5967
+#CC877E
+#DE976F
+#FC9C76
