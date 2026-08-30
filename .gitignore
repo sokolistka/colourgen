@@ -1,1 +1,16 @@
-/__pycache__
+# Ignore virtual environments
+.venv/
+venv/
+env/
+myenv/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore environment variables / secrets
+.env
+
+# Ignore large databases
+*.db
+*.sqlite3
