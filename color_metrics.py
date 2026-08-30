@@ -9,7 +9,7 @@ from itertools import combinations
 # - 2-10: perceptible
 # - 10-50: clearly different
 # For good design contrast, recommend 25+ (clearly distinguishable)
-MIN_CONTRAST_THRESHOLD = 40.0
+MIN_CONTRAST_THRESHOLD = 30.0
 
 # RGB difference threshold for "rainbow colors" perception
 # Euclidean distance in RGB space (0-255 scale)
@@ -21,8 +21,8 @@ MIN_CONTRAST_THRESHOLD = 40.0
 MIN_RGB_RAINBOW_THRESHOLD = 120.0
 
 # Thresholds for "too similar" colors
-TOO_SIMILAR_CIEDE2000 = 15.0  # Below this is too similar
-TOO_SIMILAR_RGB = 60.0  # Below this is too similar
+TOO_SIMILAR_CIEDE2000 = 40.0  # Below this is too similar
+TOO_SIMILAR_RGB = 120.0  # Below this is too similar
 
 
 def ciede2000(lab1, lab2):
@@ -298,7 +298,7 @@ def print_palette_metrics(palette_lab, palette_hex=None, palette_rgb=None):
     print("\nCIEDE2000 Distances:")
     print(" "*70)
     
-    for idx1, idx2, distance in metrics['pairs']:
+    for pair_num, (idx1, idx2, distance) in enumerate(metrics['pairs'], 1):
         color1_str = f"Color {idx1}"
         color2_str = f"Color {idx2}"
         
@@ -306,7 +306,13 @@ def print_palette_metrics(palette_lab, palette_hex=None, palette_rgb=None):
             color1_str += f" ({palette_hex[idx1]})"
             color2_str += f" ({palette_hex[idx2]})"
         
-        print(f"  {color1_str} <-> {color2_str}: {distance:.2f}")
+        # Determine if contrast is sufficient
+        if distance >= MIN_CONTRAST_THRESHOLD:
+            contrast_status = "yes"
+        else:
+            contrast_status = "no"
+        
+        print(f"  [{pair_num}] {contrast_status} {color1_str} <-> {color2_str}: {distance:.2f}")
     
     # Print pairwise RGB distances if available
     if palette_rgb is not None and 'rgb_pairs' in metrics:
@@ -324,7 +330,7 @@ def print_palette_metrics(palette_lab, palette_hex=None, palette_rgb=None):
             print(f"Std Deviation: {rgb_std_deviation:.2f}")
             print(" "*70)
         
-        for idx1, idx2, rgb_dist in metrics['rgb_pairs']:
+        for pair_num, (idx1, idx2, rgb_dist) in enumerate(metrics['rgb_pairs'], 1):
             color1_str = f"Color {idx1}"
             color2_str = f"Color {idx2}"
             
@@ -350,7 +356,7 @@ def print_palette_metrics(palette_lab, palette_hex=None, palette_rgb=None):
             else:
                 rainbow_status = "no"
             
-            print(f"  {std_status} {rainbow_status} {color1_str} <-> {color2_str}: {rgb_dist:.2f} (diff from std: {diff_from_std:.2f})")
+            print(f"  [{pair_num}] {std_status} {rainbow_status} {color1_str} <-> {color2_str}: {rgb_dist:.2f} (diff from std: {diff_from_std:.2f})")
     
     # Print summary statistics for CIEDE2000
     print("\n" + " "*70)
@@ -412,16 +418,84 @@ def print_palette_metrics(palette_lab, palette_hex=None, palette_rgb=None):
             difference = mean_rgb_distance - MIN_RGB_RAINBOW_THRESHOLD
             print(f"  Status: {status} - Colors appear as distinct RAINBOW colors")
             print(f"  Difference: +{difference:.2f} (Perfect for diverse color palettes)")
-        elif mean_rgb_distance >= 50:
+        elif mean_rgb_distance >= 40:
             status = "GOOD"
-            difference = mean_rgb_distance - 50
+            difference = mean_rgb_distance - 40
             print(f"  Status: {status} - Colors are clearly different")
             print(f"  Difference: +{difference:.2f} from 'clearly different' threshold")
         else:
             status = "POOR"
-            difference = 50 - mean_rgb_distance
+            difference = 40 - mean_rgb_distance
             print(f"  Status: {status} - Colors are too similar for rainbow perception")
             print(f"  Difference: -{difference:.2f} from 'clearly different' threshold")
+    
+    # Print "NO" pairs analysis (pairs that don't meet contrast thresholds)
+    print("\n" + " "*70)
+    print("INSUFFICIENT CONTRAST PAIRS ANALYSIS")
+    print(" "*70)
+    
+    # Find all "no" pairs for CIEDE2000
+    ciede2000_no_pairs = [(idx1, idx2, dist) for idx1, idx2, dist in metrics['pairs'] 
+                           if dist < MIN_CONTRAST_THRESHOLD]
+    
+    # Find all "no" pairs for RGB
+    rgb_no_pairs = []
+    if palette_rgb is not None and 'rgb_pairs' in metrics:
+        rgb_no_pairs = [(idx1, idx2, dist) for idx1, idx2, dist in metrics['rgb_pairs'] 
+                        if dist < MIN_RGB_RAINBOW_THRESHOLD]
+    
+    # Find intersection (pairs that are "no" in both metrics)
+    ciede2000_no_set = set((min(idx1, idx2), max(idx1, idx2)) for idx1, idx2, _ in ciede2000_no_pairs)
+    rgb_no_set = set((min(idx1, idx2), max(idx1, idx2)) for idx1, idx2, _ in rgb_no_pairs)
+    both_no_set = ciede2000_no_set & rgb_no_set
+    
+    print(f"CIEDE2000 threshold (minimum for good contrast): {MIN_CONTRAST_THRESHOLD:.2f}")
+    print(f"RGB threshold (minimum for rainbow colors): {MIN_RGB_RAINBOW_THRESHOLD:.2f}")
+    print(" "*70)
+    
+    # Print CIEDE2000 "no" pairs
+    print(f"\nCIEDE2000 'NO' pairs ({len(ciede2000_no_pairs)} pair(s)):")
+    if ciede2000_no_pairs:
+        for pair_num, (idx1, idx2, dist) in enumerate(ciede2000_no_pairs, 1):
+            color1_str = f"Color {idx1}"
+            color2_str = f"Color {idx2}"
+            if palette_hex:
+                color1_str += f" ({palette_hex[idx1]})"
+                color2_str += f" ({palette_hex[idx2]})"
+            print(f"  [{pair_num}] {color1_str} <-> {color2_str}: CIEDE2000={dist:.2f}")
+    else:
+        print("  ✓ No CIEDE2000 'no' pairs found!")
+    
+    # Print RGB "no" pairs
+    if palette_rgb is not None:
+        print(f"\nRGB 'NO' pairs ({len(rgb_no_pairs)} pair(s)):")
+        if rgb_no_pairs:
+            for pair_num, (idx1, idx2, dist) in enumerate(rgb_no_pairs, 1):
+                color1_str = f"Color {idx1}"
+                color2_str = f"Color {idx2}"
+                if palette_hex:
+                    color1_str += f" ({palette_hex[idx1]})"
+                    color2_str += f" ({palette_hex[idx2]})"
+                print(f"  [{pair_num}] {color1_str} <-> {color2_str}: RGB={dist:.2f}")
+        else:
+            print("  ✓ No RGB 'no' pairs found!")
+        
+        # Print intersection (both metrics "no")
+        print(f"\nBOTH 'NO' pairs (intersection) ({len(both_no_set)} pair(s)):")
+        if both_no_set:
+            for pair_num, (idx1, idx2) in enumerate(sorted(both_no_set), 1):
+                ciede_dist = next(d for i1, i2, d in metrics['pairs'] if (i1, i2) == (idx1, idx2))
+                rgb_dist = next(d for i1, i2, d in metrics['rgb_pairs'] if (i1, i2) == (idx1, idx2))
+                color1_str = f"Color {idx1}"
+                color2_str = f"Color {idx2}"
+                if palette_hex:
+                    color1_str += f" ({palette_hex[idx1]})"
+                    color2_str += f" ({palette_hex[idx2]})"
+                print(f"  [{pair_num}] {color1_str} <-> {color2_str}: CIEDE2000={ciede_dist:.2f}, RGB={rgb_dist:.2f}")
+        else:
+            print("  ✓ No pairs that are 'no' in both metrics!")
+    
+    print(" "*70)
     
     # Detect and print similar color groups
     print("\n" + " "*70)
@@ -438,6 +512,8 @@ def print_palette_metrics(palette_lab, palette_hex=None, palette_rgb=None):
     else:
         print(f"Found {similar_groups['total_similar_pairs']} similar color pair(s):\n")
         
+        pair_counter = 1
+        
         # Print CIEDE2000 only similar pairs
         if similar_groups['ciede2000_only']:
             print(f"Similar by CIEDE2000 only ({len(similar_groups['ciede2000_only'])} pair(s)):")
@@ -448,7 +524,8 @@ def print_palette_metrics(palette_lab, palette_hex=None, palette_rgb=None):
                 if palette_hex:
                     color1_str += f" ({palette_hex[idx1]})"
                     color2_str += f" ({palette_hex[idx2]})"
-                print(f"  • {color1_str} <-> {color2_str}: CIEDE2000={ciede_dist:.2f}")
+                print(f"  [{pair_counter}] {color1_str} <-> {color2_str}: CIEDE2000={ciede_dist:.2f}")
+                pair_counter += 1
             print()
         
         # Print RGB only similar pairs
@@ -461,7 +538,8 @@ def print_palette_metrics(palette_lab, palette_hex=None, palette_rgb=None):
                 if palette_hex:
                     color1_str += f" ({palette_hex[idx1]})"
                     color2_str += f" ({palette_hex[idx2]})"
-                print(f"  • {color1_str} <-> {color2_str}: RGB={rgb_dist:.2f}")
+                print(f"  [{pair_counter}] {color1_str} <-> {color2_str}: RGB={rgb_dist:.2f}")
+                pair_counter += 1
             print()
         
         # Print both metrics similar pairs
@@ -475,7 +553,8 @@ def print_palette_metrics(palette_lab, palette_hex=None, palette_rgb=None):
                 if palette_hex:
                     color1_str += f" ({palette_hex[idx1]})"
                     color2_str += f" ({palette_hex[idx2]})"
-                print(f"  • {color1_str} <-> {color2_str}: CIEDE2000={ciede_dist:.2f}, RGB={rgb_dist:.2f}")
+                print(f"  [{pair_counter}] {color1_str} <-> {color2_str}: CIEDE2000={ciede_dist:.2f}, RGB={rgb_dist:.2f}")
+                pair_counter += 1
             print()
     
     print(" "*70)
