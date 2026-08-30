@@ -20,6 +20,10 @@ MIN_CONTRAST_THRESHOLD = 40.0
 # For distinct rainbow colors perception, recommend 75+ (human eye perception)
 MIN_RGB_RAINBOW_THRESHOLD = 120.0
 
+# Thresholds for "too similar" colors
+TOO_SIMILAR_CIEDE2000 = 15.0  # Below this is too similar
+TOO_SIMILAR_RGB = 60.0  # Below this is too similar
+
 
 def ciede2000(lab1, lab2):
     """
@@ -131,6 +135,62 @@ def rgb_distance(rgb1, rgb2):
     
     distance = np.sqrt(np.sum((rgb1 - rgb2) ** 2))
     return distance
+
+
+def detect_similar_colors(metrics, palette_hex=None):
+    """
+    Detect and group colors that are too similar by CIEDE2000 and/or RGB metrics.
+    
+    Parameters:
+    -----------
+    metrics : dict
+        Metrics dictionary from calculate_palette_metrics
+    palette_hex : list, optional
+        List of HEX color strings for display
+    
+    Returns:
+    --------
+    dict
+        Dictionary containing similar color groups organized by similarity type
+    """
+    similar_groups = {
+        'ciede2000_only': [],      # Too similar by CIEDE2000 only
+        'rgb_only': [],            # Too similar by RGB only
+        'both': [],                # Too similar by both metrics
+        'total_similar_pairs': 0
+    }
+    
+    # Check CIEDE2000 pairs
+    ciede2000_similar = set()
+    for idx1, idx2, distance in metrics['pairs']:
+        if distance < TOO_SIMILAR_CIEDE2000:
+            ciede2000_similar.add((min(idx1, idx2), max(idx1, idx2)))
+    
+    # Check RGB pairs (if available)
+    rgb_similar = set()
+    if 'rgb_pairs' in metrics:
+        for idx1, idx2, distance in metrics['rgb_pairs']:
+            if distance < TOO_SIMILAR_RGB:
+                rgb_similar.add((min(idx1, idx2), max(idx1, idx2)))
+    
+    # Categorize similar pairs
+    for pair in ciede2000_similar:
+        if pair in rgb_similar:
+            similar_groups['both'].append(pair)
+        else:
+            similar_groups['ciede2000_only'].append(pair)
+    
+    for pair in rgb_similar:
+        if pair not in ciede2000_similar:
+            similar_groups['rgb_only'].append(pair)
+    
+    similar_groups['total_similar_pairs'] = (
+        len(similar_groups['ciede2000_only']) +
+        len(similar_groups['rgb_only']) +
+        len(similar_groups['both'])
+    )
+    
+    return similar_groups
 
 
 def calculate_palette_metrics(palette_lab, palette_rgb=None):
@@ -286,9 +346,9 @@ def print_palette_metrics(palette_lab, palette_hex=None, palette_rgb=None):
             
             # Determine if contrast is enough for rainbow colors
             if rgb_dist >= MIN_RGB_RAINBOW_THRESHOLD:
-                rainbow_status = "✓"
+                rainbow_status = "yes"
             else:
-                rainbow_status = "✗"
+                rainbow_status = "no"
             
             print(f"  {std_status} {rainbow_status} {color1_str} <-> {color2_str}: {rgb_dist:.2f} (diff from std: {diff_from_std:.2f})")
     
@@ -363,5 +423,61 @@ def print_palette_metrics(palette_lab, palette_hex=None, palette_rgb=None):
             print(f"  Status: {status} - Colors are too similar for rainbow perception")
             print(f"  Difference: -{difference:.2f} from 'clearly different' threshold")
     
+    # Detect and print similar color groups
+    print("\n" + " "*70)
+    print("SIMILAR COLORS DETECTION")
+    print(" "*70)
+    print(f"CIEDE2000 threshold: < {TOO_SIMILAR_CIEDE2000:.2f}")
+    print(f"RGB threshold: < {TOO_SIMILAR_RGB:.2f}")
+    print(" "*70)
+    
+    similar_groups = detect_similar_colors(metrics, palette_hex)
+    
+    if similar_groups['total_similar_pairs'] == 0:
+        print("✓ No similar color pairs detected. All colors are sufficiently distinct!")
+    else:
+        print(f"Found {similar_groups['total_similar_pairs']} similar color pair(s):\n")
+        
+        # Print CIEDE2000 only similar pairs
+        if similar_groups['ciede2000_only']:
+            print(f"Similar by CIEDE2000 only ({len(similar_groups['ciede2000_only'])} pair(s)):")
+            for idx1, idx2 in similar_groups['ciede2000_only']:
+                ciede_dist = [d for i1, i2, d in metrics['pairs'] if (i1, i2) == (idx1, idx2)][0]
+                color1_str = f"Color {idx1}"
+                color2_str = f"Color {idx2}"
+                if palette_hex:
+                    color1_str += f" ({palette_hex[idx1]})"
+                    color2_str += f" ({palette_hex[idx2]})"
+                print(f"  • {color1_str} <-> {color2_str}: CIEDE2000={ciede_dist:.2f}")
+            print()
+        
+        # Print RGB only similar pairs
+        if similar_groups['rgb_only']:
+            print(f"Similar by RGB only ({len(similar_groups['rgb_only'])} pair(s)):")
+            for idx1, idx2 in similar_groups['rgb_only']:
+                rgb_dist = [d for i1, i2, d in metrics['rgb_pairs'] if (i1, i2) == (idx1, idx2)][0]
+                color1_str = f"Color {idx1}"
+                color2_str = f"Color {idx2}"
+                if palette_hex:
+                    color1_str += f" ({palette_hex[idx1]})"
+                    color2_str += f" ({palette_hex[idx2]})"
+                print(f"  • {color1_str} <-> {color2_str}: RGB={rgb_dist:.2f}")
+            print()
+        
+        # Print both metrics similar pairs
+        if similar_groups['both']:
+            print(f"Similar by BOTH metrics ({len(similar_groups['both'])} pair(s)):")
+            for idx1, idx2 in similar_groups['both']:
+                ciede_dist = [d for i1, i2, d in metrics['pairs'] if (i1, i2) == (idx1, idx2)][0]
+                rgb_dist = [d for i1, i2, d in metrics['rgb_pairs'] if (i1, i2) == (idx1, idx2)][0]
+                color1_str = f"Color {idx1}"
+                color2_str = f"Color {idx2}"
+                if palette_hex:
+                    color1_str += f" ({palette_hex[idx1]})"
+                    color2_str += f" ({palette_hex[idx2]})"
+                print(f"  • {color1_str} <-> {color2_str}: CIEDE2000={ciede_dist:.2f}, RGB={rgb_dist:.2f}")
+            print()
+    
+    print(" "*70)
     
     return metrics
