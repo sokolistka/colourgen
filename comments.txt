@@ -160,3 +160,35 @@ RGB Rainbow Color Analysis (Threshold: 120.00):
   Pairs below standard deviation: 0/10
   Status: EXCELLENT - Colors appear as distinct RAINBOW colors
   Difference: +21.93 (Perfect for diverse color palettes)
+
+  EX:
+#566688
+#005FB2
+#007485
+#1BE8F9
+#C9E8FF
+
+#AE00EB
+#D449FF
+#FF6DFF
+#FF79FF
+#FFE5FF
+
+#313877
+#6959D3
+#A279E9
+#CFB1F5
+#FFAEA8
+
+#F05B93
+#FF91B3
+#F2A9C6
+#DAB3FA
+#FFEAE2
+
+coca cola
+#200000
+#652607
+#B64234
+#E96163
+#FFE8DE

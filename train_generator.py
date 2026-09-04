@@ -61,6 +61,16 @@ def load_training_data():
 def train():
     embeddings, targets = load_training_data()
 
+    print("Training parameters:")
+    print(f"  Dataset: {DATASET}")
+    print(f"  Batch size: {BATCH_SIZE}")
+    print(f"  Epochs: {EPOCHS}")
+    print(f"  Learning rate: {LEARNING_RATE}")
+    print("  Optimizer: Adam")
+    print("  Loss function: MSELoss")
+    print("  Shuffle: True")
+    print(f"  Model output: {MODEL_FILE}")
+
     print(f"Training examples: {len(embeddings)}")
     print(f"Embedding size: {embeddings.shape[1]}")
     print(f"Output size: {targets.shape[1]}")

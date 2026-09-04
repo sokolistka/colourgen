@@ -418,7 +418,7 @@ def print_palette_metrics(palette_lab, palette_hex=None, palette_rgb=None):
             difference = mean_rgb_distance - MIN_RGB_RAINBOW_THRESHOLD
             print(f"  Status: {status} - Colors appear as distinct RAINBOW colors")
             print(f"  Difference: +{difference:.2f} (Perfect for diverse color palettes)")
-        elif mean_rgb_distance >= 40:
+        else if mean_rgb_distance >= 40:
             status = "GOOD"
             difference = mean_rgb_distance - 40
             print(f"  Status: {status} - Colors are clearly different")

@@ -52,9 +52,28 @@ def prepare_data(df):
 
 def train():
 
+    dataset_file = "palette_and_text_train.csv"
+    batch_size = 32
+    learning_rate = 0.001
+    epochs = 100
+    optimizer_name = "Adam"
+    loss_name = "MSELoss"
+    shuffle = True
+    palette_normalization = "/ 255.0"
+
     df = load_dataset(
-        "palette_and_text_train.csv"
+        dataset_file
     )
+
+    print("Training parameters:")
+    print(f"  Dataset: {dataset_file}")
+    print(f"  Batch size: {batch_size}")
+    print(f"  Epochs: {epochs}")
+    print(f"  Learning rate: {learning_rate}")
+    print(f"  Optimizer: {optimizer_name}")
+    print(f"  Loss function: {loss_name}")
+    print(f"  Shuffle: {shuffle}")
+    print(f"  Palette normalization: {palette_normalization}")
 
     print(f"Loaded {len(df)} training examples")
 
@@ -83,8 +102,8 @@ def train():
 
     loader = DataLoader(
         dataset,
-        batch_size=32,
-        shuffle=True
+        batch_size=batch_size,
+        shuffle=shuffle
     )
 
     model = PaletteNetwork(
@@ -95,10 +114,8 @@ def train():
 
     optimizer = torch.optim.Adam(
         model.parameters(),
-        lr=0.001
+        lr=learning_rate
     )
-
-    epochs = 100
 
     for epoch in range(epochs):
 
