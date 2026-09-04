@@ -9,13 +9,13 @@ class PaletteNetwork(nn.Module):
 
         self.network = nn.Sequential(
             nn.Linear(input_size, 256),
-            nn.ReLU(),
+            nn.GELU(),
 
             nn.Linear(256, 128),
-            nn.ReLU(),
+            nn.GELU(),
 
             nn.Linear(128, 64),
-            nn.ReLU(),
+            nn.GELU(),
 
             nn.Linear(64, 15)
         )
