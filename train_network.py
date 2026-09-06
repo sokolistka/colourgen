@@ -1,4 +1,5 @@
 import ast
+import json
 
 import numpy as np
 import torch
@@ -7,31 +8,26 @@ import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
 from data_loader import load_dataset
-from embedding import encode
 from palette_network import PaletteNetwork
+from target_scaling import inverse_scale_targets, scale_targets
 
 
 def prepare_data(df):
 
-    descriptions = []
-
     palettes = []
 
-    for _, row in df.iterrows():
-
-        text = row["text_input"]
-
-        try:
-            words = ast.literal_eval(text)
-            text = " ".join(words)
-        except (ValueError, SyntaxError):
-            text = str(text)
-
-        descriptions.append(text)
-
-        palette = ast.literal_eval(
-            row["palette_lab_reorder"]
+    if "text_embedding" not in df.columns:
+        raise ValueError(
+            "Training data must be normalized and contain text_embedding"
         )
+
+    embeddings = np.array(
+        [json.loads(value) for value in df["text_embedding"]],
+        dtype=np.float32
+    )
+
+    for palette in df["palette_lab_reorder"]:
+        palette = ast.literal_eval(palette)
 
         palettes.append(
             np.array(
@@ -39,8 +35,6 @@ def prepare_data(df):
                 dtype=np.float32
             ).reshape(-1)
         )
-
-    embeddings = encode(descriptions)
 
     palettes = np.array(
         palettes,
@@ -52,14 +46,14 @@ def prepare_data(df):
 
 def train():
 
-    dataset_file = "palette_and_text_train.csv"
+    dataset_file = "palette_and_text_train_balanced.csv"
     batch_size = 32
     learning_rate = 0.001
     epochs = 100
     optimizer_name = "Adam"
     loss_name = "MSELoss"
     shuffle = True
-    palette_normalization = "/ 255.0"
+    palette_normalization = "LAB / 255.0 (shared train + validation transform)"
 
     df = load_dataset(
         dataset_file
@@ -92,9 +86,10 @@ def train():
         dtype=torch.float32
     )
 
-    # Normalize LAB values to approximately 0-1
+    # Normalize LAB values to approximately 0-1.
+    # The same transform must be used for every target split.
     y = torch.tensor(
-        palettes / 255.0,
+        scale_targets(palettes),
         dtype=torch.float32
     )
 
@@ -148,6 +143,13 @@ def train():
                 f"Epoch {epoch + 1}/{epochs} "
                 f"Loss: {average_loss:.6f}"
             )
+
+    # Reconstruct original LAB values only for reporting; training is done on normalized targets.
+    with torch.no_grad():
+        sample_prediction = inverse_scale_targets(model(x[:1]).cpu().numpy())
+        print(
+            f"Example prediction (reconstructed LAB): {sample_prediction[0].round(2).tolist()}"
+        )
 
     torch.save(
         model.state_dict(),

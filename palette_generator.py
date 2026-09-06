@@ -3,6 +3,7 @@ import torch
 
 from palette_network import PaletteNetwork
 from color_utils import lab_to_rgb, rgb_to_hex
+from target_scaling import inverse_scale_targets
 
 
 class PaletteGenerator:
@@ -44,8 +45,9 @@ class PaletteGenerator:
             .reshape(5, 3)
         )
 
+        prediction = inverse_scale_targets(prediction)
         prediction = np.clip(
-            prediction * 255.0,
+            prediction,
             0,
             255
         )

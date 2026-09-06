@@ -1,4 +1,5 @@
 import ast
+import json
 import os
 import time
 
@@ -9,12 +10,14 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
-from embedding import encode
 from generator_model import PaletteGeneratorModel
+from target_scaling import inverse_scale_targets, scale_targets
 
 
-DATASET = "palette_and_text_train.csv"
-VALIDATION_DATASET = "palette_and_text_val.csv"
+DATASET = (
+    "palette_and_text_train_balanced.csv"
+)
+VALIDATION_DATASET = "palette_and_text_val_normalized.csv"
 
 BATCH_SIZE = 32
 EPOCHS = 50
@@ -27,24 +30,17 @@ MODEL_FILE = "palette_generator.pth"
 def load_training_data(dataset_file, log_progress=True):
     df = pd.read_csv(dataset_file)
 
-    texts = []
+    if "text_embedding" not in df.columns:
+        raise ValueError(
+            f"{dataset_file} must be normalized and contain text_embedding"
+        )
 
-    for text in df["text_input"]:
-        try:
-            words = ast.literal_eval(text)
-            text = " ".join(words)
-        except (ValueError, SyntaxError):
-            text = str(text)
-
-        texts.append(text)
-
+    embeddings = np.array(
+        [json.loads(value) for value in df["text_embedding"]],
+        dtype=np.float32
+    )
     if log_progress:
-        print(f"Encoding {dataset_file}...")
-
-    embeddings = encode(texts)
-
-    if log_progress:
-        print("Text encoded.")
+        print(f"Loaded stored embeddings from {dataset_file}.")
 
     targets = []
 
@@ -67,6 +63,9 @@ def load_training_data(dataset_file, log_progress=True):
 
 
 def calculate_metrics(predictions, targets):
+    predictions = inverse_scale_targets(predictions)
+    targets = inverse_scale_targets(targets)
+
     errors = predictions - targets
     absolute_errors = np.abs(errors)
     squared_errors = errors ** 2
@@ -136,6 +135,9 @@ def train():
         VALIDATION_DATASET
     )
 
+    targets = scale_targets(targets)
+    validation_targets = scale_targets(validation_targets)
+
     print_table(
         "Training parameters",
         ["Parameter", "Value"],
@@ -145,6 +147,7 @@ def train():
             ["Batch size", BATCH_SIZE],
             ["Epochs", EPOCHS],
             ["Learning rate", LEARNING_RATE],
+            ["Target scaling", "LAB / 255.0 (train and validation same transform)"],
             ["Metric tolerance", f"+/-{METRIC_TOLERANCE} LAB units"],
             ["Optimizer", "Adam"],
             ["Loss function", "MSELoss"],
