@@ -8,7 +8,10 @@ class PaletteNetwork(nn.Module):
         super().__init__()
 
         self.network = nn.Sequential(
-            nn.Linear(input_size, 256),
+            nn.Linear(input_size, 512),
+            nn.GELU(),
+
+            nn.Linear(512, 256),
             nn.GELU(),
 
             nn.Linear(256, 128),

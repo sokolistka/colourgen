@@ -3,6 +3,7 @@
 venv/
 env/
 myenv/
+venv*
 
 # Ignore Python cache
 __pycache__/
@@ -14,3 +15,14 @@ __pycache__/
 # Ignore large databases
 *.db
 *.sqlite3
+
+# Ignore datasets
+*.csv
+*[Dd]ataset*.txt
+
+# Ignore dataset and training-output logs
+8.txt
+9.txt
+comments.txt
+Loaded stored embeddings.txt
+home polaznik Documents.txt
