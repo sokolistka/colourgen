@@ -35,14 +35,18 @@ class PaletteGenerator:
 
         with torch.no_grad():
 
-            prediction = self.model(
-                embedding
+            prediction = torch.stack(
+                [
+                    self.model(embedding, color_index)
+                    for color_index in range(5)
+                ],
+                dim=1
             )
 
         prediction = (
             prediction
             .numpy()
-            .reshape(5, 3)
+            .reshape(-1, 5, 3)[0]
         )
 
         prediction = inverse_scale_targets(prediction)

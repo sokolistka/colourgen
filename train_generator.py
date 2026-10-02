@@ -10,18 +10,16 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 
+from embedding import encode
 from generator_model import PaletteGeneratorModel
-from target_scaling import inverse_scale_targets, scale_targets
 
 
-DATASET = (
-    "palette_and_text_train_balanced.csv"
-)
-VALIDATION_DATASET = "palette_and_text_val_normalized.csv"
+DATASET = "palette_and_text_train.csv"
+VALIDATION_DATASET = "palette_and_text_val.csv"
 
 BATCH_SIZE = 32
-EPOCHS = 50
-LEARNING_RATE = 0.001
+EPOCHS = 200  
+LEARNING_RATE = 3e-4
 METRIC_TOLERANCE = 10.0
 
 MODEL_FILE = "palette_generator.pth"
@@ -30,17 +28,21 @@ MODEL_FILE = "palette_generator.pth"
 def load_training_data(dataset_file, log_progress=True):
     df = pd.read_csv(dataset_file)
 
-    if "text_embedding" not in df.columns:
-        raise ValueError(
-            f"{dataset_file} must be normalized and contain text_embedding"
+    if "text_embedding" in df.columns:
+        embeddings = np.array(
+            [json.loads(value) for value in df["text_embedding"]],
+            dtype=np.float32
         )
-
-    embeddings = np.array(
-        [json.loads(value) for value in df["text_embedding"]],
-        dtype=np.float32
-    )
-    if log_progress:
-        print(f"Loaded stored embeddings from {dataset_file}.")
+        if log_progress:
+            print(f"Loaded stored embeddings from {dataset_file}.")
+    else:
+        if "text_input" not in df.columns:
+            raise ValueError(
+                f"{dataset_file} must contain text_input or text_embedding"
+            )
+        embeddings = encode(df["text_input"].tolist())
+        if log_progress:
+            print(f"Generated embeddings from text_input in {dataset_file}.")
 
     targets = []
 
@@ -63,9 +65,6 @@ def load_training_data(dataset_file, log_progress=True):
 
 
 def calculate_metrics(predictions, targets):
-    predictions = inverse_scale_targets(predictions)
-    targets = inverse_scale_targets(targets)
-
     errors = predictions - targets
     absolute_errors = np.abs(errors)
     squared_errors = errors ** 2
@@ -129,14 +128,33 @@ def print_table(title, headers, rows):
         print("| " + " | ".join(str(value) for value in row) + " |")
 
 
+class EarlyStopping:
+    def __init__(self, patience=30, delta=1e-2):
+        """
+        patience: How many epochs to wait after last time validation loss improved.
+        delta: Minimum change in the monitored quantity to qualify as an improvement.
+        """
+        self.patience = patience
+        self.delta = delta
+        self.best_loss = float("inf")
+        self.counter = 0
+        self.should_stop = False
+
+    def __call__(self, val_loss):
+        if val_loss < self.best_loss - self.delta:
+            self.best_loss = val_loss
+            self.counter = 0
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.should_stop = True
+
+
 def train():
     embeddings, targets = load_training_data(DATASET)
     validation_embeddings, validation_targets = load_training_data(
         VALIDATION_DATASET
     )
-
-    targets = scale_targets(targets)
-    validation_targets = scale_targets(validation_targets)
 
     print_table(
         "Training parameters",
@@ -147,7 +165,7 @@ def train():
             ["Batch size", BATCH_SIZE],
             ["Epochs", EPOCHS],
             ["Learning rate", LEARNING_RATE],
-            ["Target scaling", "LAB / 255.0 (train and validation same transform)"],
+            ["Target scaling", "None (raw OpenCV LAB values)"],
             ["Metric tolerance", f"+/-{METRIC_TOLERANCE} LAB units"],
             ["Optimizer", "Adam"],
             ["Loss function", "MSELoss"],
@@ -197,8 +215,15 @@ def train():
 
     optimizer = torch.optim.Adam(
         model.parameters(),
-        lr=LEARNING_RATE
+        lr=LEARNING_RATE,
+        weight_decay=1e-5
     )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=EPOCHS,
+        eta_min=1e-6
+    )
+    early_stopper = EarlyStopping(patience=30, delta=0.5)
 
     loss_function = nn.MSELoss()
     activation_outputs = {}
@@ -227,7 +252,7 @@ def train():
         for batch_x, batch_y in loader:
             optimizer.zero_grad()
 
-            predictions = model(batch_x)
+            predictions = model(batch_x, batch_y)
 
             loss = loss_function(
                 predictions,
@@ -244,6 +269,7 @@ def train():
 
             total_loss += loss.item()
 
+        scheduler.step()
         average_loss = total_loss / len(loader)
         model.eval()
         with torch.no_grad():
@@ -286,6 +312,13 @@ def train():
             system_metrics["gpu_utilization"]
         ])
         epoch_start = time.perf_counter()
+        early_stopper(validation_loss)
+        if early_stopper.should_stop:
+            print(
+                f"\nEarly stopping triggered at epoch {epoch + 1}! "
+                "Validation loss stabilized."
+            )
+            break
 
     print_table(
         "Loss and accuracy by epoch",

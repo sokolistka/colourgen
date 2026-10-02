@@ -511,3 +511,5 @@ Weight, bias, and activation distributions (histograms)
 | Activation | network.3 | [-0.17, 3.63): 564772, [3.63, 7.43): 169701, [7.43, 11.24): 152917, [11.24, 15.04): 80767, [15.04, 18.84): 51014, [18.84, 22.64): 20948, [22.64, 26.45): 2606, [26.45, 30.25): 91 |
 
 Model saved to palette_generator.pth
+
+

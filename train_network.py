@@ -3,13 +3,17 @@ import json
 
 import numpy as np
 import torch
-import torch.nn as nn
 
 from torch.utils.data import TensorDataset, DataLoader
 
+from color_loss import CIEDE2000Loss
 from data_loader import load_dataset
 from palette_network import PaletteNetwork
 from target_scaling import inverse_scale_targets, scale_targets
+
+METRIC_TOLERANCE = 10.0
+VALIDATION_INTERVAL = 10
+EARLY_STOPPING_PATIENCE = 5
 
 
 def prepare_data(df):
@@ -44,23 +48,59 @@ def prepare_data(df):
     return embeddings, palettes
 
 
+def evaluate(model, loader, loss_function):
+    model.eval()
+    total_loss = 0.0
+    total_examples = 0
+    total_correct = 0
+    total_values = 0
+
+    with torch.no_grad():
+        for batch_x, batch_y in loader:
+            predictions = []
+            color_losses = []
+
+            for color_index in range(5):
+                prediction = model(batch_x, color_index)
+                target_color = batch_y[:, color_index * 3:(color_index + 1) * 3]
+                predictions.append(prediction)
+                color_losses.append(loss_function(prediction, target_color))
+
+            batch_loss = torch.stack(color_losses).mean()
+            total_loss += batch_loss.item() * batch_x.shape[0]
+            total_examples += batch_x.shape[0]
+
+            predicted_palette = torch.stack(predictions, dim=1)
+            target_palette = batch_y.reshape(-1, 5, 3)
+            errors = torch.abs(predicted_palette - target_palette) * 255.0
+            total_correct += (errors <= METRIC_TOLERANCE).sum().item()
+            total_values += errors.numel()
+
+    return total_loss / total_examples, total_correct / total_values
+
+
 def train():
 
     dataset_file = "palette_and_text_train_balanced.csv"
+    validation_dataset_file = "palette_and_text_val_normalized.csv"
     batch_size = 32
     learning_rate = 0.001
     epochs = 100
     optimizer_name = "Adam"
-    loss_name = "MSELoss"
+    loss_name = "Mean CIEDE2000 across 5 colors"
     shuffle = True
     palette_normalization = "LAB / 255.0 (shared train + validation transform)"
 
     df = load_dataset(
         dataset_file
     )
+    validation_df = load_dataset(
+        validation_dataset_file
+    )
 
     print("Training parameters:")
     print(f"  Dataset: {dataset_file}")
+    print(f"  Validation dataset: {validation_dataset_file}")
     print(f"  Batch size: {batch_size}")
     print(f"  Epochs: {epochs}")
     print(f"  Learning rate: {learning_rate}")
@@ -72,6 +112,7 @@ def train():
     print(f"Loaded {len(df)} training examples")
 
     embeddings, palettes = prepare_data(df)
+    validation_embeddings, validation_palettes = prepare_data(validation_df)
 
     print(
         f"Embedding shape: {embeddings.shape}"
@@ -89,7 +130,15 @@ def train():
     # Normalize LAB values to approximately 0-1.
     # The same transform must be used for every target split.
     y = torch.tensor(
-        scale_targets(palettes),
+        np.clip(scale_targets(palettes), 1e-6, 1.0 - 1e-6),
+        dtype=torch.float32
+    )
+    validation_x = torch.tensor(
+        validation_embeddings,
+        dtype=torch.float32
+    )
+    validation_y = torch.tensor(
+        np.clip(scale_targets(validation_palettes), 1e-6, 1.0 - 1e-6),
         dtype=torch.float32
     )
 
@@ -100,64 +149,109 @@ def train():
         batch_size=batch_size,
         shuffle=shuffle
     )
+    train_evaluation_loader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=False
+    )
+    validation_dataset = TensorDataset(validation_x, validation_y)
+    validation_loader = DataLoader(
+        validation_dataset,
+        batch_size=batch_size,
+        shuffle=False
+    )
 
     model = PaletteNetwork(
         input_size=embeddings.shape[1]
     )
 
-    loss_function = nn.MSELoss()
+    loss_function = CIEDE2000Loss()
 
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=learning_rate
     )
 
+    best_validation_loss = float("inf")
+    epochs_without_improvement = 0
+    best_model_state = None
+
     for epoch in range(epochs):
 
-        total_loss = 0.0
+        model.train()
 
         for batch_x, batch_y in loader:
 
             optimizer.zero_grad()
 
-            prediction = model(batch_x)
-
-            loss = loss_function(
-                prediction,
-                batch_y
-            )
+            color_losses = []
+            for color_index in range(5):
+                prediction = model(batch_x, color_index)
+                target_color = batch_y[:, color_index * 3:(color_index + 1) * 3]
+                color_losses.append(loss_function(prediction, target_color))
+            loss = torch.stack(color_losses).mean()
 
             loss.backward()
 
             optimizer.step()
 
-            total_loss += loss.item()
-
-        average_loss = (
-            total_loss / len(loader)
-        )
-
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % VALIDATION_INTERVAL == 0:
+            train_loss, train_accuracy = evaluate(
+                model,
+                train_evaluation_loader,
+                loss_function
+            )
+            validation_loss, _ = evaluate(
+                model,
+                validation_loader,
+                loss_function
+            )
 
             print(
                 f"Epoch {epoch + 1}/{epochs} "
-                f"Loss: {average_loss:.6f}"
+                f"Train Loss: {train_loss:.6f} "
+                f"Validation Loss: {validation_loss:.6f} "
+                f"Train Accuracy (±{METRIC_TOLERANCE:g} Lab units): "
+                f"{train_accuracy:.2%}"
             )
+
+            if validation_loss < best_validation_loss:
+                best_validation_loss = validation_loss
+                epochs_without_improvement = 0
+                best_model_state = {
+                    name: value.detach().clone()
+                    for name, value in model.state_dict().items()
+                }
+                torch.save(best_model_state, "palette_network.pth")
+                print("  Saved new best model to palette_network.pth")
+            else:
+                epochs_without_improvement += 1
+                if epochs_without_improvement >= EARLY_STOPPING_PATIENCE:
+                    print(
+                        f"Early stopping after {EARLY_STOPPING_PATIENCE} "
+                        "validation checks without improvement."
+                    )
+                    break
+
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
 
     # Reconstruct original LAB values only for reporting; training is done on normalized targets.
     with torch.no_grad():
-        sample_prediction = inverse_scale_targets(model(x[:1]).cpu().numpy())
+        sample_colors = [
+            model(x[:1], color_index).cpu().numpy()
+            for color_index in range(5)
+        ]
+        sample_prediction = inverse_scale_targets(
+            np.stack(sample_colors, axis=1).reshape(1, 15)
+        )
         print(
             f"Example prediction (reconstructed LAB): {sample_prediction[0].round(2).tolist()}"
         )
 
-    torch.save(
-        model.state_dict(),
-        "palette_network.pth"
-    )
-
     print(
-        "\nModel saved as palette_network.pth"
+        f"\nBest model saved as palette_network.pth "
+        f"(validation loss: {best_validation_loss:.6f})"
     )
 
 

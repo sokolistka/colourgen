@@ -14,3 +14,16 @@ __pycache__/
 # Ignore large databases
 *.db
 *.sqlite3
+
+# Ignore datasets
+data/
+datasets/
+*.csv
+*.tsv
+*.parquet
+*.feather
+*.arrow
+*.jsonl
+*.ndjson
+*.npy
+*.npz
