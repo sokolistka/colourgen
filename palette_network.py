@@ -10,11 +10,7 @@ class PaletteNetwork(nn.Module):
         self.color_count = color_count
 
         self.network = nn.Sequential(
-            nn.Linear(input_size + color_count, 512),
-            nn.GELU(),
-            nn.Dropout(0.3),
-
-            nn.Linear(512, 256),
+            nn.Linear(input_size, 256),
             nn.GELU(),
             nn.Dropout(0.3),
 

@@ -3,6 +3,7 @@
 venv/
 env/
 myenv/
+venv*
 
 # Ignore Python cache
 __pycache__/
@@ -10,20 +11,8 @@ __pycache__/
 
 # Ignore environment variables / secrets
 .env
+keyfile
 
 # Ignore large databases
 *.db
 *.sqlite3
-
-# Ignore datasets
-data/
-datasets/
-*.csv
-*.tsv
-*.parquet
-*.feather
-*.arrow
-*.jsonl
-*.ndjson
-*.npy
-*.npz
