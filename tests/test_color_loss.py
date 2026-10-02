@@ -49,17 +49,41 @@ def test_palette_network_predicts_one_bounded_color_per_call():
     model = PaletteNetwork(input_size=4)
     embedding = torch.zeros((2, 4))
 
-    predictions = [model(embedding, index) for index in range(5)]
+    predictions = model.generate_palette(embedding)
 
-    assert all(prediction.shape == (2, 3) for prediction in predictions)
-    assert all(
-        torch.all((prediction >= 0.0) & (prediction <= 1.0))
-        for prediction in predictions
+    assert predictions.shape == (2, 5, 3)
+    assert torch.all((predictions >= 0.0) & (predictions <= 1.0))
+
+
+def test_autoregressive_palette_rollout_backpropagates_through_network():
+    model = PaletteNetwork(input_size=4)
+    embedding = torch.zeros((2, 4))
+
+    model.generate_palette(embedding).square().mean().backward()
+
+    assert model.network[0].weight.grad is not None
+    assert torch.isfinite(model.network[0].weight.grad).all()
+
+
+def test_teacher_forcing_uses_ground_truth_prefix_as_context():
+    model = PaletteNetwork(input_size=4)
+    embedding = torch.zeros((1, 4))
+    targets = torch.arange(15, dtype=torch.float32).reshape(1, 5, 3) / 15.0
+    first_layer_inputs = []
+
+    hook = model.network[0].register_forward_pre_hook(
+        lambda _, inputs: first_layer_inputs.append(inputs[0].detach().clone())
     )
+    model.generate_palette(embedding, targets=targets)
+    hook.remove()
+
+    second_step_history = first_layer_inputs[1][0, 4:19].reshape(5, 3)
+    expected_history = torch.cat((targets[:, :1], torch.zeros((1, 4, 3))), dim=1)[0]
+    torch.testing.assert_close(second_step_history, expected_history)
 
 
 def test_palette_network_uses_dropout_after_hidden_activations():
     layers = list(PaletteNetwork(input_size=4).network.children())
     dropout_layers = [layer for layer in layers if isinstance(layer, torch.nn.Dropout)]
 
-    assert [layer.p for layer in dropout_layers] == [0.3, 0.3, 0.2]
+    assert [layer.p for layer in dropout_layers] == [0.3, 0.2]

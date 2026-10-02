@@ -48,7 +48,7 @@ def prepare_data(df):
     return embeddings, palettes
 
 
-def evaluate(model, loader, loss_function):
+def evaluate(model, loader, loss_function, teacher_forcing=False):
     model.eval()
     total_loss = 0.0
     total_examples = 0
@@ -57,21 +57,20 @@ def evaluate(model, loader, loss_function):
 
     with torch.no_grad():
         for batch_x, batch_y in loader:
-            predictions = []
-            color_losses = []
-
-            for color_index in range(5):
-                prediction = model(batch_x, color_index)
-                target_color = batch_y[:, color_index * 3:(color_index + 1) * 3]
-                predictions.append(prediction)
-                color_losses.append(loss_function(prediction, target_color))
+            predicted_palette = model.generate_palette(
+                batch_x,
+                targets=batch_y if teacher_forcing else None
+            )
+            target_palette = batch_y.reshape(-1, model.color_count, 3)
+            color_losses = [
+                loss_function(predicted_palette[:, color_index], target_palette[:, color_index])
+                for color_index in range(model.color_count)
+            ]
 
             batch_loss = torch.stack(color_losses).mean()
             total_loss += batch_loss.item() * batch_x.shape[0]
             total_examples += batch_x.shape[0]
 
-            predicted_palette = torch.stack(predictions, dim=1)
-            target_palette = batch_y.reshape(-1, 5, 3)
             errors = torch.abs(predicted_palette - target_palette) * 255.0
             total_correct += (errors <= METRIC_TOLERANCE).sum().item()
             total_values += errors.numel()
@@ -184,11 +183,12 @@ def train():
 
             optimizer.zero_grad()
 
-            color_losses = []
-            for color_index in range(5):
-                prediction = model(batch_x, color_index)
-                target_color = batch_y[:, color_index * 3:(color_index + 1) * 3]
-                color_losses.append(loss_function(prediction, target_color))
+            predicted_palette = model.generate_palette(batch_x, targets=batch_y)
+            target_palette = batch_y.reshape(-1, model.color_count, 3)
+            color_losses = [
+                loss_function(predicted_palette[:, color_index], target_palette[:, color_index])
+                for color_index in range(model.color_count)
+            ]
             loss = torch.stack(color_losses).mean()
 
             loss.backward()
@@ -199,7 +199,8 @@ def train():
             train_loss, train_accuracy = evaluate(
                 model,
                 train_evaluation_loader,
-                loss_function
+                loss_function,
+                teacher_forcing=True
             )
             validation_loss, _ = evaluate(
                 model,
@@ -209,9 +210,9 @@ def train():
 
             print(
                 f"Epoch {epoch + 1}/{epochs} "
-                f"Train Loss: {train_loss:.6f} "
-                f"Validation Loss: {validation_loss:.6f} "
-                f"Train Accuracy (±{METRIC_TOLERANCE:g} Lab units): "
+                f"Train Loss (teacher-forced): {train_loss:.6f} "
+                f"Validation Loss (free-running): {validation_loss:.6f} "
+                f"Train Accuracy (teacher-forced, ±{METRIC_TOLERANCE:g} Lab units): "
                 f"{train_accuracy:.2%}"
             )
 
@@ -238,15 +239,11 @@ def train():
 
     # Reconstruct original LAB values only for reporting; training is done on normalized targets.
     with torch.no_grad():
-        sample_colors = [
-            model(x[:1], color_index).cpu().numpy()
-            for color_index in range(5)
-        ]
-        sample_prediction = inverse_scale_targets(
-            np.stack(sample_colors, axis=1).reshape(1, 15)
-        )
+        sample_colors = model.generate_palette(x[:1]).cpu().numpy()
+        sample_prediction = inverse_scale_targets(sample_colors)
         print(
-            f"Example prediction (reconstructed LAB): {sample_prediction[0].round(2).tolist()}"
+            f"Example prediction (reconstructed LAB): "
+            f"{sample_prediction[0].reshape(-1).round(2).tolist()}"
         )
 
     print(

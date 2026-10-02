@@ -1,6 +1,6 @@
 import numpy as np
 
-from train_generator import scale_targets, inverse_scale_targets
+from target_scaling import scale_targets, inverse_scale_targets
 
 
 def test_train_and_validation_use_same_target_transform():

@@ -16,3 +16,6 @@ keyfile
 # Ignore large databases
 *.db
 *.sqlite3
+
+*.csv
+myenv/
