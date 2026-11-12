@@ -1,0 +1,21 @@
+# Ignore virtual environments
+.venv/
+venv/
+env/
+myenv/
+venv*
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore environment variables / secrets
+.env
+keyfile
+
+# Ignore large databases
+*.db
+*.sqlite3
+
+*.csv
+myenv/

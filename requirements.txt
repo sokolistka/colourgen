@@ -1,0 +1,12 @@
+# Runtime dependencies
+faiss-cpu
+numpy
+opencv-python
+pandas
+psutil
+scipy
+sentence-transformers
+torch
+
+# Test dependencies
+pytest

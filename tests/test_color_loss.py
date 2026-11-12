@@ -1,0 +1,137 @@
+import pytest
+import torch
+
+from color_loss import CIEDE2000Loss, ciede2000, normalized_lab_to_standard_lab
+from palette_network import PaletteNetwork
+from train_network import augment_lab_targets, scheduled_sampling_probability
+
+
+def test_normalized_lab_decode_produces_standard_lab():
+    encoded = torch.tensor([[0.5, 128.0 / 255.0, 128.0 / 255.0]])
+
+    decoded = normalized_lab_to_standard_lab(encoded)
+
+    torch.testing.assert_close(decoded, torch.tensor([[50.0, 0.0, 0.0]]))
+
+
+def test_torch_ciede2000_matches_reference_implementation():
+    lab1 = torch.tensor([50.0, 2.6772, -79.7751])
+    lab2 = torch.tensor([50.0, 0.0, -82.7485])
+
+    actual = ciede2000(lab1, lab2).item()
+
+    assert actual == pytest.approx(2.0425, abs=1e-4)
+
+
+def test_ciede2000_loss_has_finite_gradients():
+    prediction = torch.tensor([[0.5, 0.6, 0.3]], requires_grad=True)
+    target = torch.tensor([[0.55, 0.5, 0.4]])
+
+    loss = CIEDE2000Loss()(prediction, target)
+    loss.backward()
+
+    assert torch.isfinite(loss)
+    assert torch.isfinite(prediction.grad).all()
+    assert torch.count_nonzero(prediction.grad) > 0
+
+
+def test_ciede2000_loss_has_finite_gradients_for_neutral_colors():
+    prediction = torch.tensor([[0.5, 128.0 / 255.0, 128.0 / 255.0]], requires_grad=True)
+    target = torch.tensor([[0.55, 128.0 / 255.0, 128.0 / 255.0]])
+
+    loss = CIEDE2000Loss()(prediction, target)
+    loss.backward()
+
+    assert torch.isfinite(loss)
+    assert torch.isfinite(prediction.grad).all()
+
+
+def test_palette_network_predicts_one_bounded_color_per_call():
+    model = PaletteNetwork(input_size=4)
+    embedding = torch.zeros((2, 4))
+
+    predictions = model.generate_palette(embedding)
+
+    assert predictions.shape == (2, 5, 3)
+    assert torch.all((predictions >= 0.0) & (predictions <= 1.0))
+
+
+def test_autoregressive_palette_rollout_backpropagates_through_network():
+    model = PaletteNetwork(input_size=4)
+    embedding = torch.zeros((2, 4))
+
+    model.generate_palette(embedding).square().mean().backward()
+
+    assert model.network[0].weight.grad is not None
+    assert torch.isfinite(model.network[0].weight.grad).all()
+
+
+def test_teacher_forcing_uses_ground_truth_prefix_as_context():
+    model = PaletteNetwork(input_size=4)
+    embedding = torch.zeros((1, 4))
+    targets = torch.arange(15, dtype=torch.float32).reshape(1, 5, 3) / 15.0
+    first_layer_inputs = []
+
+    hook = model.network[0].register_forward_pre_hook(
+        lambda _, inputs: first_layer_inputs.append(inputs[0].detach().clone())
+    )
+    model.generate_palette(embedding, targets=targets)
+    hook.remove()
+
+    second_step_history = first_layer_inputs[1][0, 4:19].reshape(5, 3)
+    expected_history = torch.cat((targets[:, :1], torch.zeros((1, 4, 3))), dim=1)[0]
+    torch.testing.assert_close(second_step_history, expected_history)
+
+
+def test_scheduled_sampling_can_use_generated_colors_as_context():
+    model = PaletteNetwork(input_size=4)
+    model.eval()
+    embedding = torch.zeros((1, 4))
+    targets = torch.full((1, 5, 3), 0.9)
+    first_layer_inputs = []
+    generated_colors = []
+
+    pre_hook = model.network[0].register_forward_pre_hook(
+        lambda _, inputs: first_layer_inputs.append(inputs[0].detach().clone())
+    )
+    output_hook = model.register_forward_hook(
+        lambda _, __, output: generated_colors.append(output.detach().clone())
+    )
+    model.generate_palette(
+        embedding,
+        targets=targets,
+        prediction_probability=1.0
+    )
+    pre_hook.remove()
+    output_hook.remove()
+
+    second_step_history = first_layer_inputs[1][0, 4:19].reshape(5, 3)
+    torch.testing.assert_close(second_step_history[0], generated_colors[0][0, :])
+    assert not torch.equal(second_step_history[0], targets[0, 0])
+
+
+def test_scheduled_sampling_probability_warms_up_and_ramps_to_25_percent():
+    assert scheduled_sampling_probability(1) == 0.0
+    assert scheduled_sampling_probability(29) == 0.0
+    assert scheduled_sampling_probability(30) == pytest.approx(0.25 / 30)
+    assert scheduled_sampling_probability(59) == pytest.approx(0.25)
+    assert scheduled_sampling_probability(100) == pytest.approx(0.25)
+
+
+def test_lab_augmentation_is_subtle_and_stays_in_encoded_range():
+    targets = torch.full((8, 5, 3), 0.5)
+
+    augmented = augment_lab_targets(targets)
+
+    assert augmented.shape == targets.shape
+    assert torch.all((augmented >= 0.0) & (augmented <= 1.0))
+    assert torch.all((augmented[..., 0] - targets[..., 0]).abs() <= 0.005)
+    assert torch.all((augmented[..., 1:] - targets[..., 1:]).abs() <= 0.5 / 255.0)
+    assert not torch.equal(augmented, targets)
+
+
+def test_palette_network_uses_dropout_after_hidden_activations():
+    layers = list(PaletteNetwork(input_size=4).network.children())
+    dropout_layers = [layer for layer in layers if isinstance(layer, torch.nn.Dropout)]
+
+    assert [layer.p for layer in dropout_layers] == [0.3, 0.2]

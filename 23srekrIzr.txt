@@ -1,0 +1,34 @@
+ PS C:\Users\ucenik1\Pictures\sokolistka\colourgenallproject\project2\myproject> python train_network.py
+Training parameters:
+  Dataset: palette_and_text_train_balanced.csv
+  Validation dataset: palette_and_text_val_normalized.csv
+  Batch size: 32
+  Epochs: 100
+  Learning rate: 0.001
+  Optimizer: Adam
+  Loss function: Mean CIEDE2000 across 5 colors
+  Shuffle: True
+  Palette normalization: LAB / 255.0 (shared train + validation transform)
+Loaded 8147 training examples
+Embedding shape: (8147, 384)
+Palette shape: (8147, 15)
+Epoch 10/100 Train Loss: 17.482889 Validation Loss: 25.844316 Train Accuracy (±10 Lab units): 39.36%
+Epoch 20/100 Train Loss: 12.129394 Validation Loss: 27.491847 Train Accuracy (±10 Lab units): 54.16%
+Epoch 30/100 Train Loss: 7.945175 Validation Loss: 27.920579 Train Accuracy (±10 Lab units): 69.48%
+Epoch 40/100 Train Loss: 5.774153 Validation Loss: 28.172399 Train Accuracy (±10 Lab units): 79.95%
+Epoch 50/100 Train Loss: 5.143885 Validation Loss: 28.048542 Train Accuracy (±10 Lab units): 83.12%
+Epoch 60/100 Train Loss: 4.488379 Validation Loss: 28.061666 Train Accuracy (±10 Lab units): 86.73%
+Epoch 70/100 Train Loss: 4.088608 Validation Loss: 27.817321 Train Accuracy (±10 Lab units): 88.97%
+Epoch 80/100 Train Loss: 3.747178 Validation Loss: 27.603400 Train Accuracy (±10 Lab units): 90.69%
+Epoch 90/100 Train Loss: 3.615076 Validation Loss: 27.462789 Train Accuracy (±10 Lab units): 91.09%
+Epoch 100/100 Train Loss: 3.335722 Validation Loss: 27.308750 Train Accuracy (±10 Lab units): 92.46%
+Example prediction (reconstructed LAB): [168.0800018310547, 177.05999755859375, 77.63999938964844, 197.97000122070312, 122.13999938964844, 128.6199951171875, 208.2899932861328, 96.5, 105.44000244140625, 222.2899932861328, 60.27000045776367, 164.52000427246094, 243.57000732421875, 134.7899932861328, 126.38999938964844]
+
+Model saved as palette_network.pth
+
+change the code so program will generate a colors one by one, not the whole pallete at the same time
+also normalize the output by changing the activation function(if exists, create if not) into the sigmoid function
+Use CIE Delta E for the loss function; for the 5 Lab colors, you will obtain 5 values, and the final loss function can be 1/5 * sum(CIEdE[1-5]).
+Just keep in mind regarding CIEdE that you first have to convert the NN output to standard Lab, and then calculate the CIEdE.
+
+

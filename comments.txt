@@ -1,0 +1,194 @@
+Working generates correctly pallets most of the cases
+HEX:
+#598094
+#7EA8C8
+#69C1B3
+#72B8CE
+#6D92C2
+
+RGB:
+[89, 128, 148]
+[126, 168, 200]
+[105, 193, 179]
+[114, 184, 206]
+[109, 146, 194]
+
+LAB:
+(131.0, 120.8, 113.0)
+(171.2, 122.8, 107.6)
+(185.0, 98.6, 127.6)
+(181.8, 112.0, 110.6)
+(152.2, 128.6, 99.2)
+
+HEX:
+#803F47
+#AB7A8C
+#CEA0B3
+#E4E0ED
+#746E7C
+
+#598094
+#7EA8C8
+#69C1B3
+#72B8CE
+#6D92C2
+
+#598094
+#7EA8C8
+#69C1B3
+#72B8CE
+#6D92C2
+
+The last example without specific roots or metrics permamently build in the program after check.
+Input: Sky blue
+HEX:
+#9ED9E1
+#6FC1C6
+#74D4E5
+#6BBAC3
+#76C6CD
+Morning sky 
+#484660
+#75718F
+#9B838D
+#9E869D
+#F4C2BE
+Morning sky sun is rising
+HEX:
+#A6654E
+#BB5967
+#CC877E
+#DE976F
+#FC9C76
+
+HEX:
+#005B98
+#748E97
+#59B8D1
+#CBC49C
+#B1E8FF
+
+HEX:
+#87CC96
+#C9D686
+#ABE596
+#BCEE80
+#DEEFAD
+
+#005B98
+#748E97
+#59B8D1
+#CBC49C
+#B1E8FF
+
+Describe a palette (or 'exit'): blue hippo
+
+Generated palette:
+
+HEX:
+#005B98
+#748E97
+#59B8D1
+#CBC49C
+#B1E8FF
+
+RGB:
+[0, 91, 152]
+[116, 142, 151]
+[89, 184, 209]
+[203, 196, 156]
+[177, 232, 255]
+
+LAB:
+(95.85, 128.59, 88.99)
+(146.87, 121.89, 120.83)
+(179.18, 107.99, 107.78)
+(201.5, 124.13, 149.05)
+(227.19, 116.22, 111.42)
+PALETTE METRICS (CIEDE2000 & RGB Color Differences)
+                                                                      
+
+CIEDE2000 Distances:
+                                                                      
+  Color 0 (#005B98) <-> Color 1 (#748E97): 27.55
+  Color 0 (#005B98) <-> Color 2 (#59B8D1): 37.40
+  Color 0 (#005B98) <-> Color 3 (#CBC49C): 47.48
+  Color 0 (#005B98) <-> Color 4 (#B1E8FF): 50.15
+  Color 1 (#748E97) <-> Color 2 (#59B8D1): 12.17
+  Color 1 (#748E97) <-> Color 3 (#CBC49C): 20.93
+  Color 1 (#748E97) <-> Color 4 (#B1E8FF): 26.30
+  Color 2 (#59B8D1) <-> Color 3 (#CBC49C): 12.73
+  Color 2 (#59B8D1) <-> Color 4 (#B1E8FF): 14.74
+  Color 3 (#CBC49C) <-> Color 4 (#B1E8FF): 8.18
+
+RGB Distances:
+                                                                      
+Mean Distance: 141.93
+Std Deviation: 52.34
+                                                                      
+  ↑ ✓ Color 0 (#005B98) <-> Color 1 (#748E97): 126.72 (diff from std: 74.38)
+  ↑ ✓ Color 0 (#005B98) <-> Color 2 (#59B8D1): 140.78 (diff from std: 88.44)
+  ↑ ✓ Color 0 (#005B98) <-> Color 3 (#CBC49C): 228.58 (diff from std: 176.24)
+  ↑ ✓ Color 0 (#005B98) <-> Color 4 (#B1E8FF): 248.63 (diff from std: 196.30)
+  ↑ ✗ Color 1 (#748E97) <-> Color 2 (#59B8D1): 76.53 (diff from std: 24.19)
+  ↑ ✗ Color 1 (#748E97) <-> Color 3 (#CBC49C): 102.52 (diff from std: 50.18)
+  ↑ ✓ Color 1 (#748E97) <-> Color 4 (#B1E8FF): 150.46 (diff from std: 98.12)
+  ↑ ✓ Color 2 (#59B8D1) <-> Color 3 (#CBC49C): 126.29 (diff from std: 73.95)
+  ↑ ✗ Color 2 (#59B8D1) <-> Color 4 (#B1E8FF): 110.29 (diff from std: 57.95)
+  ↑ ✗ Color 3 (#CBC49C) <-> Color 4 (#B1E8FF): 108.50 (diff from std: 56.16)
+
+                                                                      
+Summary Statistics (CIEDE2000):
+  Minimum distance: 8.18
+  Maximum distance: 50.15
+  Mean distance:    25.76
+
+Summary Statistics (RGB):
+  Minimum distance: 76.53
+  Maximum distance: 248.63
+  Mean distance:    141.93
+  Std Deviation:    52.34
+
+                                                                      
+CIEDE2000 Contrast Analysis (Threshold: 40.00):
+  Status: POOR - Average contrast is LOWER than threshold
+  Difference: -14.24 (Colors may appear too similar)
+
+                                                                      
+RGB Rainbow Color Analysis (Threshold: 120.00):
+  Pairs above standard deviation: 10/10
+  Pairs below standard deviation: 0/10
+  Status: EXCELLENT - Colors appear as distinct RAINBOW colors
+  Difference: +21.93 (Perfect for diverse color palettes)
+
+  EX:
+#566688
+#005FB2
+#007485
+#1BE8F9
+#C9E8FF
+
+#AE00EB
+#D449FF
+#FF6DFF
+#FF79FF
+#FFE5FF
+
+#313877
+#6959D3
+#A279E9
+#CFB1F5
+#FFAEA8
+
+#F05B93
+#FF91B3
+#F2A9C6
+#DAB3FA
+#FFEAE2
+
+coca cola
+#200000
+#652607
+#B64234
+#E96163
+#FFE8DE
